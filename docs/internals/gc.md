@@ -183,12 +183,24 @@ gated one level further, on a threshold of its own.
 `SPINEL_GC_STRESS=2` pins the first two at 0 instead, over any
 `SPINEL_GC_THRESHOLD_*KB` floor: every allocation after the first collects.
 
+In the threaded build the object floor is multiplied by the worker pool
+(`sp_alloc_worker_tune`): 256 KB at one worker, 2 MB at eight, and the same
+for a `SPINEL_GC_THRESHOLD_KB` or `SPINEL_GC_THRESHOLD_OBJ_KB` floor. The
+string floor is not, because the string threshold is already per worker
+(see Threads below).
+
 After each collection the threshold is retuned from what the sweep actually
 recovered:
 
 - freed less than a quarter of the pre-collect bytes: the heap is genuinely
   growing, so `threshold = before * 2` and back off;
-- otherwise `threshold = live * 4`, floored at the initial value.
+- otherwise `threshold = live * 2`, floored at the initial value: the heap
+  may hold its live set again in garbage before the next collection.
+
+`live` here is what the next mark walks, not one heap alone: the object
+budget adds the share of the string heap the last mark spent its time on
+(`SPINEL_GC_OBJ_BUDGET`), and the string budget a share of the object old
+generation (`SPINEL_GC_STR_BUDGET`). [thread.md](../thread.md) describes both.
 
 A promoted string counts as a survivor, not a reclamation. Leaving it out would
 read as a very productive sweep and shrink the trigger, collecting harder and
